@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:jaxrs="http://cxf.apache.org/jaxrs"
+	xmlns:jaxws="http://cxf.apache.org/jaxws" 
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:cxf="http://cxf.apache.org/core"
+	xsi:schemaLocation="
+	http://www.springframework.org/schema/beans
+	http://www.springframework.org/schema/beans/spring-beans.xsd
+	http://cxf.apache.org/jaxrs
+	http://cxf.apache.org/schemas/jaxrs.xsd
+	http://cxf.apache.org/jaxws
+	http://cxf.apache.org/schemas/jaxws.xsd
+	http://www.springframework.org/schema/context 
+	http://www.springframework.org/schema/context/spring-context-4.1.xsd
+	http://cxf.apache.org/core 
+              http://cxf.apache.org/schemas/core.xsd">
+
+	<import resource="classpath:META-INF/cxf/cxf.xml" />
+	<import resource="classpath:META-INF/cxf/cxf-servlet.xml" />
+	
+	<context:property-placeholder location="classpath:META-INF/db-hibernate.properties" />
+	
+	<bean id="dataSource" class="org.apache.tomcat.dbcp.dbcp.BasicDataSource">
+      <property name="driverClassName" value="${hibernate.connection.driver_class}" />
+      <property name="url" value="${hibernate.connection.url}" />
+      <property name="username" value="${db.user.name}" />
+      <property name="password" value="${db.user.password}" />
+   </bean>
+
+	<bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="packagesToScan" value="com.bid.app.server.user" />
+		<property name="configLocation" value="classpath:META-INF/hibernate-config.xml" />
+	</bean>
+	
+	<bean id="emailServiceFactory" class="com.bid.app.server.email.EmailServiceFactory">
+		<constructor-arg value="EmailService" type="String" />
+		<constructor-arg value="9" type="int" />
+	</bean>
+	<bean id="container" class="com.bid.app.server.bootstrap.GenericContainer"
+		init-method="initContainer">
+		<constructor-arg>
+			<list>
+				<ref bean="emailServiceFactory" />
+				<ref bean="userServiceFactory" />
+			</list>
+		</constructor-arg>
+		<constructor-arg type="org.hibernate.SessionFactory" ref="sessionFactory" />
+		<property name="hfile" value="classpath:META-INF/hibernate-config.xml"/>
+	</bean>
+	<bean id="userservice" class="com.bid.app.server.user.UserService" />
+		
+
+	<bean id="userServiceFactory" class="com.bid.app.server.user.UserServiceFactory">
+		<constructor-arg value="user-service" type="String" />
+		<constructor-arg value="10" type="int" />
+		<constructor-arg ref="userservice" />
+		<property name="messageRegistry" ref="usermsgregistry" />
+	</bean>
+	<bean id="usermsgregistry" class="com.bid.app.server.user.UserServiceMessageRegistry">
+		<constructor-arg value="/META-INF/user-service-msg.properties" type="String" />
+	</bean>
+	<bean id="userRestService" class="com.bid.app.server.user.UserRestServiceHandler">
+		<constructor-arg value="user" type="String" />
+		<constructor-arg value="register" type="String" />
+		<constructor-arg ref="container" />
+	</bean>
+	<bean id="mockrestservice" class="com.bid.app.server.web.MockRestServiceHandler">
+		<constructor-arg value="mockmod" type="String" />
+		<constructor-arg value="mockcomp" type="String" />
+		<constructor-arg ref="container" />
+	</bean>
+	<bean id="jsonProvider" 
+		class="com.bid.app.server.bootstrap.CustomJsonProvider"/>
+	<jaxrs:server id="customerService" address="/app">
+		<jaxrs:serviceBeans>
+			<ref bean="restServiceBean" />
+		</jaxrs:serviceBeans>
+		<jaxrs:providers>
+			<ref bean='jsonProvider' />
+		</jaxrs:providers>
+		<jaxrs:extensionMappings>
+			<entry key="json" value="application/json" />
+		</jaxrs:extensionMappings>
+		<jaxrs:features> 
+            <cxf:logging/> 
+        </jaxrs:features> 
+	</jaxrs:server>
+	<bean id="restServiceBean" class="com.bid.app.server.web.RestCallInterceptor" />
+</beans>
